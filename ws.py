@@ -1,40 +1,25 @@
-import os
 import asyncio
 import websockets
-from aiohttp import web
+import requests
+import json
+import os
 
-# Render ka PORT environment variable use karna hai
-PORT = int(os.environ.get("PORT", 10000))
+N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "https://n.ultracreation.in/webhook/knowlarity")
 
-# WebSocket handler
 async def handler(websocket):
-    print("✅ Incoming WebSocket connection")
     async for message in websocket:
-        if isinstance(message, bytes):
-            print("🎧 Received audio chunk")
-            # Yahan Whisper STT + n8n webhook call karna h
-        else:
-            print("📥 Metadata:", message)
-
-# HTTP health check handler (for Render)
-async def health(request):
-    return web.Response(text="Server is running ✅")
+        print(f"📩 Received: {message}")
+        try:
+            payload = json.loads(message)
+            response = requests.post(N8N_WEBHOOK_URL, json={"payload": payload})
+            print(f"📤 Forwarded to n8n: {response.status_code}")
+        except Exception as e:
+            print(f"❌ Error: {e}")
 
 async def main():
-    # WebSocket server
-    ws_server = await websockets.serve(handler, "0.0.0.0", PORT)
-    
-    # HTTP server (for health checks)
-    app = web.Application()
-    app.router.add_get("/", health)
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", PORT)
-    await site.start()
-
-    print(f"🚀 Server started on port {PORT} (WebSocket + HTTP)")
-
-    await asyncio.Future()  # Run forever
+    async with websockets.serve(handler, "0.0.0.0", 8080):
+        print("✅ WebSocket bridge running on ws://0.0.0.0:8080")
+        await asyncio.Future()  # Keeps the server running
 
 if __name__ == "__main__":
     asyncio.run(main())
