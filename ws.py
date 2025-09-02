@@ -23,6 +23,7 @@ async def handler(websocket, path):
                             response = requests.post(N8N_WEBHOOK_URL, json={"payload": payload}, timeout=5)
                             if response.status_code == 200:
                                 print(f"📤 Forwarded to n8n: {response.status_code}")
+                                await websocket.send("✅ Acknowledged")  # 👈 Final fix: unblock client
                                 break
                             else:
                                 print(f"⚠️ Attempt {attempt+1} failed: {response.status_code}")
@@ -30,8 +31,10 @@ async def handler(websocket, path):
                             print(f"🔁 Retry {attempt+1} failed: {e}")
                 else:
                     print("⚠️ Invalid payload structure")
+                    await websocket.send("❌ Invalid payload")
             except Exception as e:
                 print(f"❌ JSON parse error: {e}")
+                await websocket.send("❌ JSON error")
     except Exception as e:
         print(f"❌ Connection error: {e}")
 
@@ -41,10 +44,8 @@ async def health(request):
 
 # 🚀 Main server startup
 async def main():
-    # Start WebSocket server
     ws_server = await websockets.serve(handler, "0.0.0.0", PORT)
-    
-    # Start HTTP healthcheck server
+
     app = web.Application()
     app.add_routes([web.get("/", health)])
     runner = web.AppRunner(app)
@@ -55,7 +56,7 @@ async def main():
     print(f"🚀 WebSocket server on ws://0.0.0.0:{PORT}")
     print(f"🌍 Healthcheck running on http://0.0.0.0:{PORT + 1}")
 
-    await asyncio.Future()  # Keeps both servers running
+    await asyncio.Future()
 
 if __name__ == "__main__":
     asyncio.run(main())
