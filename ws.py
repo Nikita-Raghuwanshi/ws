@@ -9,6 +9,7 @@ async def handler(websocket, path):
     async for message in websocket:
         if isinstance(message, bytes):
             print("🎧 Received audio chunk")
+            # yahan tum Whisper STT + n8n webhook call kar sakti ho
         else:
             print("📥 Metadata:", message)
 
