@@ -4,9 +4,12 @@ import requests
 import json
 import os
 
+# Use Render-assigned port
+PORT = int(os.environ.get("PORT", 10000))
 N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "https://n.ultracreation.in/webhook/knowlarity")
 
-async def handler(websocket):
+async def handler(websocket, path):  # path argument required by websockets.serve
+    print("🔗 Client connected")
     async for message in websocket:
         print(f"📩 Received: {message}")
         try:
@@ -17,8 +20,8 @@ async def handler(websocket):
             print(f"❌ Error: {e}")
 
 async def main():
-    async with websockets.serve(handler, "0.0.0.0", 8080):
-        print("✅ WebSocket bridge running on ws://0.0.0.0:8080")
+    async with websockets.serve(handler, "0.0.0.0", PORT):
+        print(f"✅ WebSocket bridge running on ws://0.0.0.0:{PORT}")
         await asyncio.Future()  # Keeps the server running
 
 if __name__ == "__main__":
