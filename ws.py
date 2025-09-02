@@ -15,6 +15,7 @@ async def handler(websocket, path):
     try:
         async for message in websocket:
             print(f"📩 Received: {message}")
+            acknowledged = False
             try:
                 payload = json.loads(message)
                 if isinstance(payload, dict) and "callerId" in payload:
@@ -23,18 +24,25 @@ async def handler(websocket, path):
                             response = requests.post(N8N_WEBHOOK_URL, json={"payload": payload}, timeout=5)
                             if response.status_code == 200:
                                 print(f"📤 Forwarded to n8n: {response.status_code}")
-                                await websocket.send("✅ Acknowledged")  # 👈 Final fix: unblock client
+                                await websocket.send("✅ Acknowledged")
+                                print("✅ Response sent to client")
+                                acknowledged = True
                                 break
                             else:
                                 print(f"⚠️ Attempt {attempt+1} failed: {response.status_code}")
                         except Exception as e:
                             print(f"🔁 Retry {attempt+1} failed: {e}")
+                    if not acknowledged:
+                        await websocket.send("⚠️ Webhook failed after retries")
+                        print("⚠️ Fallback response sent to client")
                 else:
                     print("⚠️ Invalid payload structure")
                     await websocket.send("❌ Invalid payload")
+                    print("❌ Invalid payload response sent")
             except Exception as e:
                 print(f"❌ JSON parse error: {e}")
                 await websocket.send("❌ JSON error")
+                print("❌ JSON error response sent")
     except Exception as e:
         print(f"❌ Connection error: {e}")
 
