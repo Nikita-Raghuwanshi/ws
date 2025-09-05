@@ -4,45 +4,68 @@ import websockets
 import requests
 import json
 from aiohttp import web
+from datetime import datetime
 
-# 🔧 Configurable webhook URL via environment variable
+# 🔧 Configurable webhook URL and port
 N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "https://n.ultracreation.in/webhook/knowlarity")
 PORT = int(os.environ.get("PORT", 10000))
 
+# 🧵 Active session log (optional)
+active_sessions = {}
+
 # 🔄 WebSocket handler
 async def handler(websocket, path):
-    print("🔗 Client connected")
+    print("🔗 Client connected:", websocket.remote_address)
     try:
         async for message in websocket:
             print(f"📩 Received: {message}")
-            acknowledged = False
             try:
                 payload = json.loads(message)
-                if isinstance(payload, dict) and "callerId" in payload:
-                    for attempt in range(3):
-                        try:
-                            response = requests.post(N8N_WEBHOOK_URL, json={"payload": payload}, timeout=5)
-                            if response.status_code == 200:
-                                print(f"📤 Forwarded to n8n: {response.status_code}")
-                                await websocket.send("✅ Acknowledged")
-                                print("✅ Response sent to client")
-                                acknowledged = True
-                                break
-                            else:
-                                print(f"⚠️ Attempt {attempt+1} failed: {response.status_code}")
-                        except Exception as e:
-                            print(f"🔁 Retry {attempt+1} failed: {e}")
-                    if not acknowledged:
-                        await websocket.send("⚠️ Webhook failed after retries")
-                        print("⚠️ Fallback response sent to client")
+                call_id = payload.get("call_id")
+                event_type = payload.get("event_type")
+
+                # ✅ Validate payload structure
+                if not call_id or not event_type:
+                    await websocket.send(json.dumps({"error": "❌ Missing call_id or event_type"}))
+                    print("❌ Invalid payload structure")
+                    continue
+
+                # 🧠 Log session
+                active_sessions[call_id] = {
+                    "event": event_type,
+                    "timestamp": datetime.now().isoformat()
+                }
+
+                # 📤 Forward to n8n
+                response = None
+                for attempt in range(3):
+                    try:
+                        response = requests.post(N8N_WEBHOOK_URL, json=payload, timeout=5)
+                        if response.status_code == 200:
+                            print(f"✅ Forwarded to n8n: {response.status_code}")
+                            break
+                        else:
+                            print(f"⚠️ Attempt {attempt+1} failed: {response.status_code}")
+                    except Exception as e:
+                        print(f"🔁 Retry {attempt+1} failed: {e}")
+
+                # 🧪 Handle n8n response
+                if response and response.status_code == 200:
+                    try:
+                        reply = response.json()
+                        await websocket.send(json.dumps(reply))
+                        print(f"📤 Sent to Knowlarity: {reply}")
+                    except Exception as e:
+                        await websocket.send(json.dumps({"error": "⚠️ Failed to parse n8n response"}))
+                        print("⚠️ Response parse error:", e)
                 else:
-                    print("⚠️ Invalid payload structure")
-                    await websocket.send("❌ Invalid payload")
-                    print("❌ Invalid payload response sent")
-            except Exception as e:
-                print(f"❌ JSON parse error: {e}")
-                await websocket.send("❌ JSON error")
-                print("❌ JSON error response sent")
+                    await websocket.send(json.dumps({"error": "❌ Webhook failed after retries"}))
+                    print("❌ Webhook failure fallback sent")
+
+            except json.JSONDecodeError as e:
+                await websocket.send(json.dumps({"error": "❌ Invalid JSON"}))
+                print("❌ JSON parse error:", e)
+
     except Exception as e:
         print(f"❌ Connection error: {e}")
 
