@@ -94,10 +94,7 @@ async def audio_bridge(request):
 
 # 🚀 Server startup
 async def main():
-    # WebSocket server (no path arg — validate manually)
-    ws_server = await websockets.serve(handler, "0.0.0.0", PORT)
-
-    # HTTP server for healthcheck and audio bridge
+    # ✅ Start HTTP server on PORT (public-facing)
     app = web.Application()
     app.add_routes([
         web.get("/", health),
@@ -105,12 +102,15 @@ async def main():
     ])
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", PORT + 1)
+    site = web.TCPSite(runner, "0.0.0.0", PORT)
     await site.start()
 
-    print(f"🚀 WebSocket server on ws://0.0.0.0:{PORT}/calls")
-    print(f"🌍 Healthcheck at http://0.0.0.0:{PORT + 1}/")
-    print(f"🔊 Audio bridge at http://0.0.0.0:{PORT + 1}/bridge/audio")
+    # ✅ Start WebSocket server on PORT + 1 (internal)
+    ws_server = await websockets.serve(handler, "0.0.0.0", PORT + 1)
+
+    print(f"🌍 HTTP server running on http://0.0.0.0:{PORT}/")
+    print(f"🔊 Audio bridge at http://0.0.0.0:{PORT}/bridge/audio")
+    print(f"🚀 WebSocket server on ws://0.0.0.0:{PORT + 1}/calls")
 
     await asyncio.Future()
 
