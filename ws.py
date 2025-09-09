@@ -13,9 +13,14 @@ PORT = int(os.environ.get("PORT", 10000))
 # 🧵 Active session log (optional)
 active_sessions = {}
 
-# 🔄 WebSocket handler at /calls
+# 🔄 WebSocket handler
 async def handler(websocket, path):
-    print("🔗 Client connected:", websocket.remote_address)
+    print(f"🔗 Client connected from {websocket.remote_address} on path: {path}")
+    if path != "/calls":
+        await websocket.close(code=1008, reason="Invalid path")
+        print("❌ Connection rejected: invalid path")
+        return
+
     try:
         async for message in websocket:
             print(f"📩 Received: {message}")
@@ -51,11 +56,14 @@ async def handler(websocket, path):
                         print(f"📤 Sent to Knowlarity: {reply}")
                     except Exception as e:
                         await websocket.send(json.dumps({"error": "⚠️ Failed to parse n8n response"}))
+                        print("⚠️ Response parse error:", e)
                 else:
                     await websocket.send(json.dumps({"error": "❌ Webhook failed after retries"}))
+                    print("❌ Webhook failure fallback sent")
 
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
                 await websocket.send(json.dumps({"error": "❌ Invalid JSON"}))
+                print("❌ JSON parse error:", e)
 
     except Exception as e:
         print(f"❌ Connection error: {e}")
@@ -86,8 +94,10 @@ async def audio_bridge(request):
 
 # 🚀 Server startup
 async def main():
-    ws_server = await websockets.serve(handler, "0.0.0.0", PORT, path="/calls")
+    # WebSocket server (no path arg — validate manually)
+    ws_server = await websockets.serve(handler, "0.0.0.0", PORT)
 
+    # HTTP server for healthcheck and audio bridge
     app = web.Application()
     app.add_routes([
         web.get("/", health),
