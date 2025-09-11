@@ -1,4 +1,3 @@
-gunicorn==21.2.0
 aiohttp==3.9.1
 websockets==12.0
 requests==2.31.0
