@@ -6,7 +6,7 @@ import json
 import base64
 from aiohttp import web
 from datetime import datetime
-from pydub import AudioSegment
+import ffmpeg
 
 # 🔧 Configurable webhook URL and port
 N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "https://n.ultracreation.in/webhook/knowlarity")
@@ -62,15 +62,18 @@ async def handler(websocket, path):
                         audio_base64 = reply.get("audio_base64")
                         if audio_base64:
                             mp3_bytes = base64.b64decode(audio_base64)
-                            mp3_path = f"{call_id}.mp3"
                             pcm_path = f"{call_id}.pcm"
 
-                            with open(mp3_path, "wb") as f:
-                                f.write(mp3_bytes)
-
-                            mp3 = AudioSegment.from_file(mp3_path, format="mp3")
-                            pcm = mp3.set_frame_rate(8000).set_channels(1).set_sample_width(2)
-                            pcm.export(pcm_path, format="raw")
+                            # Convert MP3 to PCM using ffmpeg-python
+                            process = (
+                                ffmpeg
+                                .input('pipe:0')
+                                .output(pcm_path, format='s16le', acodec='pcm_s16le', ac=1, ar='8000')
+                                .run_async(pipe_stdin=True)
+                            )
+                            process.stdin.write(mp3_bytes)
+                            process.stdin.close()
+                            process.wait()
 
                             # 🔊 Stream PCM over WebSocket
                             with open(pcm_path, "rb") as f:
