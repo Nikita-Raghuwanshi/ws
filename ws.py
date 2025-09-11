@@ -121,8 +121,11 @@ async def audio_bridge(request):
         print("❌ Error in audio bridge:", e)
         return web.json_response({"error": "❌ Internal server error"}, status=500)
 
-# 🚀 Server startup
-async def main():
+# 🚀 Gunicorn-compatible startup
+def main():
+    return asyncio.run(start_servers())
+
+async def start_servers():
     app = web.Application()
     app.add_routes([
         web.get("/", health),
@@ -133,13 +136,8 @@ async def main():
     site = web.TCPSite(runner, "0.0.0.0", PORT)
     await site.start()
 
-    ws_server = await websockets.serve(handler, "0.0.0.0", PORT + 1)
+    await websockets.serve(handler, "0.0.0.0", PORT + 1)
 
     print(f"🌍 HTTP server running on http://0.0.0.0:{PORT}/")
     print(f"🔊 Audio bridge at http://0.0.0.0:{PORT}/bridge/audio")
     print(f"🚀 WebSocket server on ws://0.0.0.0:{PORT + 1}/calls")
-
-    await asyncio.Future()
-
-if __name__ == "__main__":
-    asyncio.run(main())
