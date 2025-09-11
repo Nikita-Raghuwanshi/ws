@@ -8,7 +8,7 @@ from datetime import datetime
 
 # Configuration
 N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "https://n.ultracreation.in/webhook/knowlarity")
-KNOWLARITY_API_URL = os.getenv("KNOWLARITY_API_URL", "https://api.knowlarity.com/api/audio")
+KNOWLARITY_API_URL = os.getenv("KNOWLARITY_API_URL", "https://api.knowlarity.com/voice/call")
 PORT = int(os.environ.get("PORT", 10000))
 
 async def health(request):
