@@ -3,8 +3,10 @@ import asyncio
 import websockets
 import requests
 import json
+import base64
 from aiohttp import web
 from datetime import datetime
+from pydub import AudioSegment
 
 # 🔧 Configurable webhook URL and port
 N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "https://n.ultracreation.in/webhook/knowlarity")
@@ -38,6 +40,7 @@ async def handler(websocket, path):
                     "timestamp": datetime.now().isoformat()
                 }
 
+                # 🔁 Forward to n8n webhook
                 response = None
                 for attempt in range(3):
                     try:
@@ -54,9 +57,32 @@ async def handler(websocket, path):
                         reply = response.json()
                         await websocket.send(json.dumps(reply))
                         print(f"📤 Sent to Knowlarity: {reply}")
+
+                        # 🎧 Audio playback logic
+                        audio_base64 = reply.get("audio_base64")
+                        if audio_base64:
+                            mp3_bytes = base64.b64decode(audio_base64)
+                            mp3_path = f"{call_id}.mp3"
+                            pcm_path = f"{call_id}.pcm"
+
+                            with open(mp3_path, "wb") as f:
+                                f.write(mp3_bytes)
+
+                            mp3 = AudioSegment.from_file(mp3_path, format="mp3")
+                            pcm = mp3.set_frame_rate(8000).set_channels(1).set_sample_width(2)
+                            pcm.export(pcm_path, format="raw")
+
+                            # 🔊 Stream PCM over WebSocket
+                            with open(pcm_path, "rb") as f:
+                                while chunk := f.read(320):  # 20ms @ 8kHz
+                                    await websocket.send(chunk)
+                                    await asyncio.sleep(0.02)
+
+                            print(f"✅ Audio streamed for call_id: {call_id}")
+
                     except Exception as e:
-                        await websocket.send(json.dumps({"error": "⚠️ Failed to parse n8n response"}))
-                        print("⚠️ Response parse error:", e)
+                        await websocket.send(json.dumps({"error": "⚠️ Failed to process audio"}))
+                        print("⚠️ Audio processing error:", e)
                 else:
                     await websocket.send(json.dumps({"error": "❌ Webhook failed after retries"}))
                     print("❌ Webhook failure fallback sent")
@@ -72,7 +98,7 @@ async def handler(websocket, path):
 async def health(request):
     return web.Response(text="Server is running ✅")
 
-# 🔊 Audio bridge endpoint for n8n
+# 🔊 Audio bridge endpoint for n8n (optional)
 async def audio_bridge(request):
     try:
         data = await request.json()
@@ -94,7 +120,6 @@ async def audio_bridge(request):
 
 # 🚀 Server startup
 async def main():
-    # ✅ Start HTTP server on PORT (public-facing)
     app = web.Application()
     app.add_routes([
         web.get("/", health),
@@ -105,7 +130,6 @@ async def main():
     site = web.TCPSite(runner, "0.0.0.0", PORT)
     await site.start()
 
-    # ✅ Start WebSocket server on PORT + 1 (internal)
     ws_server = await websockets.serve(handler, "0.0.0.0", PORT + 1)
 
     print(f"🌍 HTTP server running on http://0.0.0.0:{PORT}/")
