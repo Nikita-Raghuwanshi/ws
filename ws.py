@@ -5,7 +5,7 @@ from aiohttp import web
 from datetime import datetime
 
 # Configuration
-KNOWLARITY_API_URL = os.getenv("KNOWLARITY_API_URL", "https://api.knowlarity.com/voice/call")
+KNOWLARITY_API_URL = os.getenv("KNOWLARITY_API_URL", "https://kpi.knowlarity.com/voice/call")
 PORT = int(os.environ.get("PORT", 10000))
 KNOWLARITY_API_KEY = os.getenv("KNOWLARITY_API_KEY", "QdQa83awS05tyB0KAVATX7tvm3WuBXz16QEluhix")
 
