@@ -7,6 +7,8 @@ from datetime import datetime
 # Configuration
 KNOWLARITY_API_URL = os.getenv("KNOWLARITY_API_URL", "https://api.knowlarity.com/voice/call")
 PORT = int(os.environ.get("PORT", 10000))
+KNOWLARITY_API_KEY = os.getenv("KNOWLARITY_API_KEY", "QdQa83awS05tyB0KAVATX7tvm3WuBXz16QEluhix")
+
 
 async def health(request):
     return web.Response(text="Bridge Server Running ✅")
@@ -36,9 +38,21 @@ async def audio_bridge(request):
             "sample_rate": 8000,
             "timestamp": timestamp
         }
+        
+        # Prepare headers for Knowlarity Authentication
+        headers = {
+            'Authorization': KNOWLARITY_API_KEY,
+            'Content-Type': 'application/json'
+        }
 
         try:
-            response = requests.post(KNOWLARITY_API_URL, json=knowlarity_payload, timeout=10)
+            # Make the API call to Knowlarity with headers
+            response = requests.post(
+                KNOWLARITY_API_URL,
+                json=knowlarity_payload,
+                headers=headers,
+                timeout=10
+            )
             print(f"📨 Knowlarity Response: {response.status_code} - {response.text}")
         except Exception as e:
             print(f"❌ Knowlarity Forwarding Failed: {e}")
@@ -47,8 +61,6 @@ async def audio_bridge(request):
         return web.json_response({
             "status": "Audio received and forwarded",
             "call_id": call_id,
-            "audio_format": "pcm_s16le",
-            "sample_rate": 8000,
             "timestamp": timestamp
         })
 
@@ -71,6 +83,10 @@ async def start_server():
     print(f"🔊 Audio Endpoint: /bridge/audio")
 
 if __name__ == "__main__":
+    if not KNOWLARITY_API_KEY or "पेस्ट_करें" in KNOWLARITY_API_KEY:
+        print("🔴 CRITICAL: KNOWLARITY_API_KEY is not set! Please add your API Key to the script.")
+    
     loop = asyncio.get_event_loop()
     loop.run_until_complete(start_server())
     loop.run_forever()
+
