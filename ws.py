@@ -199,5 +199,5 @@ def main():
             loop.run_until_complete(runner.cleanup())
         loop.close()
 
-if _name_ == "_main_":
+if _name_ == "__main__":
     main()
